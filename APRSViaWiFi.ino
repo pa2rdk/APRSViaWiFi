@@ -61,8 +61,8 @@
 #define TFT_SHADOW 0xE71C
 #define TFT_BUTTONTOPCOLOR 0xB5FE
 
-#define OTAHOST      "https://www.rjdekok.nl/Updates/APRSviaWiFi"
-#define OTAVERSION   "v1.0"
+#define OTAHOST      "https://www.rjdekok.nl/Updates/APRSViaWiFi"
+#define OTAVERSION   "v1.1"
 
 #include "NotoSansBold15.h"
 #include "NotoSansBold36.h"
