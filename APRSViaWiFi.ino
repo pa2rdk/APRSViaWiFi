@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////////////////////
-// V1.0
+// V1.2
 //
 // LibAPRS from :https://codeload.github.com/tomasbrincil/LibAPRS-esp32/zip/refs/heads/master
 //
@@ -62,7 +62,7 @@
 #define TFT_BUTTONTOPCOLOR 0xB5FE
 
 #define OTAHOST      "https://www.rjdekok.nl/Updates/APRSViaWiFi"
-#define OTAVERSION   "v1.1"
+#define OTAVERSION   "v1.2"
 
 #include "NotoSansBold15.h"
 #include "NotoSansBold36.h"
@@ -154,6 +154,7 @@ long startedDebugScreen = millis();
 int debugLine = 0;
 
 uint16_t* tft_buffer;
+uint16_t* crc_buffer;
 bool      buffer_loaded = false;
 uint16_t  spr_width = 0;
 uint16_t  bg_color  = 0;
@@ -184,6 +185,7 @@ HardwareSerial GPSSerial(1);
 #include "webpages.h"
 
 void setup() {
+  crc_buffer =  (uint16_t*) malloc(52 * 52 * 2);  
   pinMode(DISPLAYLEDPIN, OUTPUT);
   digitalWrite(DISPLAYLEDPIN, 0);
   
@@ -593,12 +595,13 @@ void ShowDebugScreen(char header[]) {
 void SendBeaconViaWiFi() {
   if (APRSGatewayConnect()) {
     if (!settings.isDebug) {
-      tft.fillCircle(12, 12, 10, TFT_BLACK);
-      tft.fillCircle(24, 24, 24, TFT_YELLOW);
+      //tft.fillCircle(12, 12, 10, TFT_BLACK);
+      tft.readRect(135, 95, 50, 50, crc_buffer);
+      tft.fillCircle(160, 120, 24, TFT_YELLOW);
       tft.setTextDatum(MC_DATUM);
       tft.setTextPadding(tft.textWidth("AP"));
       tft.setTextColor(TFT_BLACK, TFT_YELLOW);
-      tft.drawString("AP", 24, 26, 4);
+      tft.drawString("AP", 160, 122, 4);
     }
     String sLat;
     String sLon;
@@ -614,7 +617,8 @@ void SendBeaconViaWiFi() {
     httpNet.println(buf);
     if (ReadHTTPNet()) DrawDebugInfo(buf);
     if (!settings.isDebug) {
-      tft.fillCircle(24, 24, 24, TFT_BLACK);
+      //tft.fillCircle(24, 24, 24, TFT_BLACK);
+      tft.pushRect(135, 95, 50, 50, crc_buffer);
     }
   }
 }
@@ -660,12 +664,13 @@ void APRSGatewayUpdate() {
   sprintf(buf, "Date & Time :%02d/%02d/%02d %02d:%02d:%02d", gps.date.month(), gps.date.day(), gps.date.year(), gps.time.hour(), gps.time.minute(), gps.time.second());
   DrawDebugInfo(buf);
   if (!settings.isDebug) {
-    tft.fillCircle(12, 12, 10, TFT_BLACK);
-    tft.fillCircle(24, 24, 24, TFT_PINK);
+    //tft.fillCircle(12, 12, 10, TFT_BLACK);
+    tft.readRect(135, 95, 50, 50, crc_buffer);
+    tft.fillCircle(160, 120, 24, TFT_PINK);
     tft.setTextDatum(MC_DATUM);
     tft.setTextPadding(tft.textWidth("GW"));
     tft.setTextColor(TFT_BLACK, TFT_PINK);
-    tft.drawString("GW", 24, 26, 4);
+    tft.drawString("GW", 160, 122, 4);
   }
   if (APRSGatewayConnect()) {
     DrawDebugInfo("Update IGate info on APRS");
@@ -688,7 +693,8 @@ void APRSGatewayUpdate() {
     if (!ReadHTTPNet()) aprsGatewayConnected = false;
   } else DrawDebugInfo("APRS Gateway not connected");
   if (!settings.isDebug) {
-    tft.fillCircle(24, 24, 24, TFT_BLACK);
+    //tft.fillCircle(24, 24, 24, TFT_BLACK);
+    tft.pushRect(135, 95, 50, 50, crc_buffer);
   }
 }
 
