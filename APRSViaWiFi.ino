@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////////////////////
-// V1.2
+// V1.4
 //
 // LibAPRS from :https://codeload.github.com/tomasbrincil/LibAPRS-esp32/zip/refs/heads/master
 //
@@ -62,7 +62,7 @@
 #define TFT_BUTTONTOPCOLOR 0xB5FE
 
 #define OTAHOST      "https://www.rjdekok.nl/Updates/APRSViaWiFi"
-#define OTAVERSION   "v1.2"
+#define OTAVERSION   "v1.4"
 
 #include "NotoSansBold15.h"
 #include "NotoSansBold36.h"
@@ -134,6 +134,7 @@ typedef struct {
   uint16_t calData3;
   uint16_t calData4; 
   bool doRotate;
+  bool rotateTouch;
 } Settings;
 
 long lastBeacon = millis();
@@ -219,8 +220,8 @@ void setup() {
   
   tft.begin();
   tft.init();
-  tft.setRotation(settings.doRotate?3:1);
-  uint16_t calData[5] = {settings.calData0, settings.calData1, settings.calData2, settings.calData3, settings.calData4};
+  tft.setRotation(settings.doRotate?1:3);
+  uint16_t calData[5] = {settings.calData0, settings.calData1, settings.calData2, settings.calData3, settings.rotateTouch?7:1};
   tft.setTouch(calData);
   tft.setTextColor(TFT_YELLOW, TFT_BLACK);
 
@@ -338,16 +339,25 @@ void loop() {
     tft.setTextColor(TFT_WHITE, bg_color, true);
     char sz[50];
     tft.setTextDatum(ML_DATUM);
+    tft.drawString(OTAVERSION, 2, 215, 1); 
     sprintf(sz, "%02d:%02d:%02d", gps.time.hour(), gps.time.minute(), gps.time.second());
     tft.drawString(sz, 2, 225, 1); 
     sprintf(sz, "%02d/%02d/%02d", gps.date.month(), gps.date.day(), gps.date.year());
     tft.drawString(sz, 2, 235, 1); 
     sprintf(sz, "%d.%d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
     tft.setTextDatum(MR_DATUM);
+    tft.drawString("  " + String(settings.call) + "-"  + String(settings.ssid),318,215,1);
     tft.drawString("  " + String(WiFi.SSID()), 318, 225, 1);
     tft.drawString(sz, 318, 235, 1);
     plotNeedle(gps.speed.kmph(), 30);
   }  
+
+  uint16_t touchX = 0, touchY = 0;
+  bool pressed = tft.getTouch(&touchX, &touchY);
+  if (pressed){
+    Serial.printf("Pressed = x:%d,y:%d\r\n",touchX,touchY);
+    if (touchY<50 && touchX<50) ESP.restart();
+  }
 
   if (settings.useAPRS && (gps.location.isValid() || settings.isDebug)) {
     bool doBeacon = false;
@@ -866,7 +876,7 @@ String Processor(const String &var) {
   if (var == "lon") return String(settings.lon, 6);
   if (var == "isDebug") return settings.isDebug ? "checked" : "";
   if (var == "doRotate") return settings.doRotate ? "checked" : "";
-
+  if (var == "rotateTouch") return settings.rotateTouch ? "checked" : "";
   return var;
 }
 
@@ -894,6 +904,7 @@ void SaveSettings(AsyncWebServerRequest *request) {
   if (request->hasParam("lat")) settings.lon = request->getParam("lon")->value().toFloat();
   settings.isDebug = request->hasParam("isDebug");
   settings.doRotate = request->hasParam("doRotate");
+  settings.rotateTouch = request->hasParam("rotateTouch");
 }
 
 bool tft_output(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t* bitmap){

@@ -347,6 +347,20 @@ const char settings_html[] PROGMEM = R"rawliteral(
       <div class="divinfo">
         <table class="fwidth">
           <tr>
+            <td class="hwidth" style="text-align:right;font-size: medium;">
+              Rotate touch:
+            </td>
+            <td class="hwidth" style="text-align:left;font-size: medium;">
+              <input type="checkbox" name="rotateTouch" value="rotateTouch" %rotateTouch%>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <br>
+
+      <div class="divinfo">
+        <table class="fwidth">
+          <tr>
             <td class="fwidth" style="text-align:center;font-size: medium;">
               <input style="font-size: medium;"" type="submit" value="Submit">
             </td>
@@ -367,7 +381,6 @@ const char settings_html[] PROGMEM = R"rawliteral(
           </td>
           <td style="text-align:right">
             <a href="/"><button>Main</button></a>
-            <a href="/calibrate"><button class="button">Calibrate</button></a>
             <a href="/reboot"><button>Reboot</button></a>
           </td>
         </tr>

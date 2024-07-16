@@ -9,7 +9,7 @@ const wlanSSID wifiNetworks[] {
 };
 
 Settings settings = {
-    '#',                //chkDigit
+    '!',                //chkDigit
     "YourSSID",         //wifiSSID[25];
     "WiFiPassword!",    //wifiPass[25];
     "rotate.aprs.net",  //aprsIP
@@ -48,5 +48,6 @@ Settings settings = {
     271,                //touchRotation calData[2]
     3505,               //touchRotation calData[3]
     7,                  //touchRotation calData[4]
-    1                   //doRotate
+    1,                  //doRotate
+    1                   //rotateTouch
 };
