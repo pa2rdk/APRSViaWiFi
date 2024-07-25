@@ -3,13 +3,13 @@
 const wlanSSID wifiNetworks[] {
     {"PI4RAZ","PI4RAZ_Zoetermeer"},
     {"Loretz_Gast", "Lor_Steg_98"},
-    {"Netwerk1", "Netwerk2"},
+    {"Netwerk1", "Netwerk1"},
     {"Netwerk2", "Netwerk2"},
     {"FHanna", "Kleinsteg71"}
 };
 
 Settings settings = {
-    '!',                //chkDigit
+    '?',                //chkDigit
     "YourSSID",         //wifiSSID[25];
     "WiFiPassword!",    //wifiPass[25];
     "rotate.aprs.net",  //aprsIP
@@ -49,5 +49,6 @@ Settings settings = {
     3505,               //touchRotation calData[3]
     7,                  //touchRotation calData[4]
     1,                  //doRotate
-    1                   //rotateTouch
+    1,                  //rotateTouch
+    "YourGoogleMapsAPIKey"  //GoogleMapKey    
 };

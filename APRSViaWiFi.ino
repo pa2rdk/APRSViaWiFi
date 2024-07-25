@@ -1,4 +1,5 @@
 /////////////////////////////////////////////////////////////////////////////////////////
+// V1.5 Webserver implemented including Google Maps
 // V1.4
 //
 // LibAPRS from :https://codeload.github.com/tomasbrincil/LibAPRS-esp32/zip/refs/heads/master
@@ -62,7 +63,7 @@
 #define TFT_BUTTONTOPCOLOR 0xB5FE
 
 #define OTAHOST      "https://www.rjdekok.nl/Updates/APRSViaWiFi"
-#define OTAVERSION   "v1.4"
+#define OTAVERSION   "v1.5"
 
 #include "NotoSansBold15.h"
 #include "NotoSansBold36.h"
@@ -135,6 +136,7 @@ typedef struct {
   uint16_t calData4; 
   bool doRotate;
   bool rotateTouch;
+  char GoogleMapKey[50];
 } Settings;
 
 long lastBeacon = millis();
@@ -167,8 +169,8 @@ const int ledFreq = 5000;
 const int ledResol = 8;
 const int ledChannelforTFT = 0;
 
-#include "config.h"
-//#include "rdk_config.h"  // Change to config.h
+//#include "config.h"
+#include "config.h"  // Change to config.h
 
 TFT_eSPI tft       = TFT_eSPI();  // Invoke custom library
 TFT_eSprite needle = TFT_eSprite(&tft); // Sprite object for needle
@@ -179,6 +181,7 @@ WiFiClient httpNet;
 TinyGPSPlus gps;
 RDKOTA rdkOTA(OTAHOST);
 AsyncWebServer server(80);
+AsyncEventSource events("/events");
 
 HardwareSerial GPSSerial(1);
 
@@ -331,8 +334,8 @@ void loop() {
     tft.setTextColor(TFT_GREEN, bg_color, true);
     tft.setTextPadding(spr_width);
     
-    tft.drawString("   Lat:" + String(gps.location.lat(),6) + "N  ", 160, 180);
-    tft.drawString("   Lon:" + String(gps.location.lng(),6) + "E  ", 160, 190);
+    tft.drawString("   Lat:" + String(gps.location.lat()==0?settings.lat:gps.location.lat(),6) + "N  ", 160, 180);
+    tft.drawString("   Lon:" + String(gps.location.lng()==0?settings.lon:gps.location.lng(),6) + "E  ", 160, 190);
     tft.drawString("   Height:" + String(gps.altitude.meters(),0) + "M   ", 160, 200);
     String sCourse = gps.course.isValid()?String(gps.course.deg(),0):"***";
     tft.drawString("   Course:" + sCourse + "   ", 160,210);   
@@ -354,13 +357,15 @@ void loop() {
 
   uint16_t touchX = 0, touchY = 0;
   bool pressed = tft.getTouch(&touchX, &touchY);
+  bool beaconPressed = false;
   if (pressed){
     Serial.printf("Pressed = x:%d,y:%d\r\n",touchX,touchY);
     if (touchY<50 && touchX<50) ESP.restart();
+    if (touchY<50 && touchX>270) beaconPressed = true;
   }
 
   if (settings.useAPRS && (gps.location.isValid() || settings.isDebug)) {
-    bool doBeacon = false;
+    bool doBeacon = beaconPressed;
     long beaconInterval = settings.interval * settings.multiplier * 1000;
     int gpsSpeed = gps.speed.isValid() ? gps.speed.kmph() : 0;
     if (gpsSpeed > 5) beaconInterval = settings.interval * 4 * 1000;
@@ -387,6 +392,12 @@ void loop() {
     APRSGatewayUpdate();
     aprsGatewayRefreshed = millis();
   }  
+
+  if ((millis() - webRefresh) > 1000) {
+    DebugPrintln("Refresh webpage");
+    RefreshWebPage();
+    webRefresh = millis();
+  }
 
 }
 
@@ -425,13 +436,14 @@ void ReadTask(void *pvParameters) { // This is a task.
       request->send_P(200, "text/html", settings_html, Processor);
     });
 
-    // events.onConnect([](AsyncEventSourceClient *client) {
-    //   DebugPrintln("Connect web");
-    //   if (client->lastId()) {
-    //     DebugPrintf("Client reconnected! Last message ID that it got is: %u\n", client->lastId());
-    //   }
-    //   client->send("hello!", NULL, millis(), 10000);
-    // });
+    events.onConnect([](AsyncEventSourceClient *client) {
+      DebugPrintln("Connect web");
+      if (client->lastId()) {
+        DebugPrintf("Client reconnected! Last message ID that it got is: %u\n", client->lastId());
+      }
+      client->send("hello!", NULL, millis(), 10000);
+    });
+    server.addHandler(&events);    
 
     server.begin();
     DebugPrintln("HTTP server started");
@@ -485,6 +497,22 @@ void doBeep(int timeLen){
   }
 }
 
+void RefreshWebPage() {
+  if (wifiAvailable || wifiAPMode) {
+    sprintf(buf, "%s", String(gps.location.lat()==0?settings.lat:gps.location.lat(),4));
+    events.send(buf, "LATINFO", millis());
+    sprintf(buf, "%s", String(gps.location.lng()==0?settings.lon:gps.location.lng(),4));
+    events.send(buf, "LONINFO", millis());
+    sprintf(buf, "%s", String(gps.speed.isValid() ? gps.speed.kmph() : 0, 0));
+    events.send(buf, "SPEEDINFO", millis());
+    sprintf(buf, "%s", gps.location.age() > 5000 ? "Inv." : String(gps.location.age()));
+    events.send(buf, "AGEINFO", millis());
+    sprintf(buf, "%s,%s", String(gps.location.lat()==0?settings.lat:gps.location.lat(),6), String(gps.location.lng()==0?settings.lon:gps.location.lng(),6));
+    events.send(buf, "DRAWMAP", millis());
+    //sprintf(buf, "%s", String(gps.location.lat(), 4), String(gps.location.lng(), 4), String(gps.speed.isValid() ? gps.speed.kmph() : 0, 0), gps.location.age() > 5000 ? "Inv." : String(gps.location.age()));
+  }
+}
+
 void PrintGPSInfo() {
   char sz[50];
   tft.fillRect(2, 2, 320, 200, TFT_BLACK);
@@ -513,7 +541,7 @@ void PrintGPSInfo() {
     tft.setTextColor(TFT_GREEN, TFT_BLACK);
     tft.drawString("SSID        :" + String(WiFi.SSID()), 2, 120, 1);
     sprintf(sz, "IP Address  :%d.%d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
-    Serial.println(sz);
+    DebugPrintln(sz);
     tft.drawString(sz, 2, 128, 1);
     tft.drawString("RSSI        :" + String(WiFi.RSSI()), 2, 136, 1);
   }
@@ -582,11 +610,6 @@ bool ReadHTTPNet() {
 void FillAPRSInfo() {
   buf[0] = '\0';
   sprintf(buf, "APRS:%s-%d, %s-%d", settings.call, settings.ssid, settings.dest, settings.destSsid);
-}
-
-void FillGPSInfo() {
-  buf[0] = '\0';
-  sprintf(buf, "GPS :LAT:%s, LON:%s, Speed:%s KM, Age:%s     ", String(gps.location.lat(), 4), String(gps.location.lng(), 4), String(gps.speed.isValid() ? gps.speed.kmph() : 0, 0), gps.location.age() > 5000 ? "Inv." : String(gps.location.age()));
 }
 
 void ShowDebugScreen(char header[]) {
@@ -840,14 +863,26 @@ String Processor(const String &var) {
     FillAPRSInfo();
     return buf;
   }
-  if (var == "GPSINFO") {
-    FillGPSInfo();
+
+  if (var == "LATINFO") {
+    sprintf(buf, "%s", String(gps.location.lat(), 4));
     return buf;
   }
-  if (var == "BEACONINFO") {
-    buf[0] = '\0';
+
+  if (var == "LONINFO") {
+    sprintf(buf, "%s", String(gps.location.lng(), 4));
     return buf;
   }
+
+  if (var == "SPEEDINFO") {
+    sprintf(buf, "%s", String(gps.speed.isValid() ? gps.speed.kmph() : 0, 0));
+    return buf;
+  }
+
+  if (var == "AGEINFO") {
+    sprintf(buf, "%s", gps.location.age() > 5000 ? "Inv." : String(gps.location.age()));
+    return buf;
+  }  
 
   if (var == "wifiSSID") return settings.wifiSSID;
   if (var == "wifiPass") return settings.wifiPass;
@@ -874,6 +909,7 @@ String Processor(const String &var) {
   if (var == "multiplier") return String(settings.multiplier);
   if (var == "lat") return String(settings.lat, 6);
   if (var == "lon") return String(settings.lon, 6);
+  if (var == "GoogleMapKey") return settings.GoogleMapKey;
   if (var == "isDebug") return settings.isDebug ? "checked" : "";
   if (var == "doRotate") return settings.doRotate ? "checked" : "";
   if (var == "rotateTouch") return settings.rotateTouch ? "checked" : "";
@@ -902,6 +938,7 @@ void SaveSettings(AsyncWebServerRequest *request) {
   if (request->hasParam("multiplier")) settings.multiplier = request->getParam("multiplier")->value().toInt();
   if (request->hasParam("lat")) settings.lat = request->getParam("lat")->value().toFloat();
   if (request->hasParam("lat")) settings.lon = request->getParam("lon")->value().toFloat();
+  if (request->hasParam("GoogleMapKey")) request->getParam("GoogleMapKey")->value().toCharArray(settings.GoogleMapKey, 50);  
   settings.isDebug = request->hasParam("isDebug");
   settings.doRotate = request->hasParam("doRotate");
   settings.rotateTouch = request->hasParam("rotateTouch");

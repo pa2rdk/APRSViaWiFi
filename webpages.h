@@ -7,12 +7,28 @@ const char index_html[] PROGMEM = R"rawliteral(
     <!-- <meta http-equiv="refresh" content="1">  -->
     <link rel="icon" href="data:,">
     <link rel="stylesheet" type="text/css" href="style.css">
+    <script src="https://maps.googleapis.com/maps/api/js?key=%GoogleMapKey%" async defer></script>
   </head>
   <body>
   <div class="freqinfo" style="border:solid; border-radius: 1em; border-color: black; background-image: linear-gradient(blue, black); text-align:center">
     <div class="topnav">
-    <h1>APRS WiFi Server</h1>
+      <h1>APRS WiFi Server</h1>
+      <h6>%APRSINFO%, AGE:<span id="AGEINFO">%AGEINFO%</span><br></h6>
+      <h2> </h2>     
     </div>
+
+    <div class="row">
+      <div style="line-height:10px" class="col-md-6 text-center">
+        <h1 style="text-align:center;color:yellow"><span>GPS</span></h1>
+        <h2 style="text-align:center;color:yellow"><span id="LATINFO">%LATINFO%</span>N, <span id="LONINFO">%LONINFO%</span>E</h2>
+        <h2 style="text-align:center;color:red">Speed:<span id="SPEEDINFO">%SPEEDINFO%</span> KM/H</h6>
+        <br>
+      </div>
+    </div>
+    <hr>
+    <div class="row">
+      <div style="margin: auto; width:80%; height:600px" id="map">
+    </div>    
 
   </div>
   <hr>
@@ -31,6 +47,101 @@ const char index_html[] PROGMEM = R"rawliteral(
       </tbody>
     </table>
   </div>
+
+  <script>
+  	var map = undefined;
+    var mapInitizialized = false;
+    var marker = undefined;
+    var path = [];
+
+    function initMap(lat, lng){
+      var mapOptions = {
+        center: new google.maps.LatLng(lat, lng),
+        zoom: 14,
+			  mapTypeId: 'roadmap'
+      };
+      map = new google.maps.Map(document.getElementById("map"), mapOptions);
+    }
+	
+    function moveToLocation(lat, lng){
+      var center = new google.maps.LatLng(lat, lng);
+		  map.panTo(center);
+      
+      if (typeof marker !== 'undefined'){
+        path[0] = new google.maps.LatLng(marker.getPosition().lat(), marker.getPosition().lng());
+        path[1] = new google.maps.LatLng(lat, lng);
+        marker.setMap(null);
+      }
+
+		  addMarker(lat, lng);
+      drawLine();	
+	  }
+
+    function addMarker(lat, lng){
+        marker = new google.maps.Marker({
+        position: new google.maps.LatLng(lat, lng),
+        map: map,
+        icon: "https://www.rjdekok.nl/icons8-car-48.png",
+        title: "My APRS location"
+    	});		
+    }
+
+    function drawLine(){
+        var line = new google.maps.Polyline({
+        path: path,
+        strokeColor: "#FF0000",
+        strokeOpacity: 1.0,
+        strokeWeight: 1,
+        geodesic: true,
+        map: map
+      });
+    } 
+
+    if (!!window.EventSource) {
+      var source = new EventSource('/events');
+      source.addEventListener('GPSINFO', function(e) {
+        console.log("GPSINFO", e.data);
+        document.getElementById("GPSINFO").innerHTML = e.data;
+      }, false);
+
+      source.addEventListener('LATINFO', function(e) {
+        console.log("LATINFO", e.data);
+        document.getElementById("LATINFO").innerHTML = e.data;
+      }, false);
+
+      source.addEventListener('LONINFO', function(e) {
+        console.log("LONINFO", e.data);
+        document.getElementById("LONINFO").innerHTML = e.data;
+      }, false);
+
+      source.addEventListener('SPEEDINFO', function(e) {
+        console.log("SPEEDINFO", e.data);
+        document.getElementById("SPEEDINFO").innerHTML = e.data;
+      }, false);
+
+      source.addEventListener('AGEINFO', function(e) {
+        console.log("AGEINFO", e.data);
+        document.getElementById("AGEINFO").innerHTML = e.data;
+      }, false);
+
+      source.addEventListener('DRAWMAP', function(e) {
+        console.log("DRAWMAP", e.data);
+        const location = e.data.split(",");
+        if (!mapInitizialized){
+          mapInitizialized = true;
+          initMap(location[0],location[1]);
+        }
+        moveToLocation(location[0],location[1]);
+      }, false);
+
+      source.addEventListener('INITMAP', function(e) {
+        alert("InitMap" + e.data);
+        console.log("DRAWMAP", e.data);
+        const location = e.data.split(",");
+        initMap(location[0],location[1]);
+      }, false);
+    }
+  </script>    
 
   </body>
   </html>
@@ -320,15 +431,15 @@ const char settings_html[] PROGMEM = R"rawliteral(
         <table class="fwidth">
           <tr>
             <td class="hwidth" style="text-align:right;font-size: medium;">
-              Debugmode:
+              Google Maps API Key:
             </td>
             <td class="hwidth" style="text-align:left;font-size: medium;">
-              <input type="checkbox" name="isDebug" value="isDebug" %isDebug%>
+              <input type="text" name="GoogleMapKey" value="%GoogleMapKey%">
             </td>
           </tr>
         </table>
       </div>
-      <br>
+      <br>      
 
       <div class="divinfo">
         <table class="fwidth">
@@ -357,6 +468,20 @@ const char settings_html[] PROGMEM = R"rawliteral(
         </table>
       </div>
       <br>
+
+      <div class="divinfo">
+        <table class="fwidth">
+          <tr>
+            <td class="hwidth" style="text-align:right;font-size: medium;">
+              Debugmode:
+            </td>
+            <td class="hwidth" style="text-align:left;font-size: medium;">
+              <input type="checkbox" name="isDebug" value="isDebug" %isDebug%>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <br>      
 
       <div class="divinfo">
         <table class="fwidth">
@@ -493,5 +618,3 @@ h1 {
   margin-left: 0;
   margin-right: 0;
 })rawliteral";
-
-
