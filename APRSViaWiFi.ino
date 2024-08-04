@@ -1,4 +1,5 @@
 /////////////////////////////////////////////////////////////////////////////////////////
+// V1.6 Verbeterde WiFi recovery
 // V1.5 Webserver implemented including Google Maps
 // V1.4
 //
@@ -49,7 +50,7 @@
 #define EEPROM_SIZE 2048
 #define VERSION "PA2RDK_IGATE_TCP"
 #define INFO "Arduino PARDK IGATE"
-#define WDT_TIMEOUT 10
+#define WDT_TIMEOUT 30
 
 #define RXD1 39
 #define TXD1 -1
@@ -63,7 +64,7 @@
 #define TFT_BUTTONTOPCOLOR 0xB5FE
 
 #define OTAHOST      "https://www.rjdekok.nl/Updates/APRSViaWiFi"
-#define OTAVERSION   "v1.5"
+#define OTAVERSION   "v1.6"
 
 #include "NotoSansBold15.h"
 #include "NotoSansBold36.h"
@@ -170,7 +171,7 @@ const int ledResol = 8;
 const int ledChannelforTFT = 0;
 
 //#include "config.h"
-#include "config.h"  // Change to config.h
+#include "rdk_config.h"  // Change to config.h
 
 TFT_eSPI tft       = TFT_eSPI();  // Invoke custom library
 TFT_eSprite needle = TFT_eSprite(&tft); // Sprite object for needle
@@ -323,8 +324,8 @@ void loop() {
     tft.setTextPadding(spr_width);
     tft.setTextDatum(MC_DATUM);
     tft.drawString(String(gps.satellites.value()), 12, 12);
-    tft.fillCircle(308, 12, 10, WiFi.status() == WL_CONNECTED?TFT_GREEN:TFT_RED);
-    tft.setTextColor(TFT_BLACK, WiFi.status() == WL_CONNECTED?TFT_GREEN:TFT_RED, true);
+    tft.fillCircle(308, 12, 10, wifiMulti.run() == WL_CONNECTED?TFT_GREEN:TFT_RED);
+    tft.setTextColor(TFT_BLACK, wifiMulti.run() == WL_CONNECTED?TFT_GREEN:TFT_RED, true);
     spr_width = tft.textWidth("W");
     tft.setTextPadding(spr_width);
     tft.setTextDatum(MC_DATUM);
@@ -347,10 +348,15 @@ void loop() {
     tft.drawString(sz, 2, 225, 1); 
     sprintf(sz, "%02d/%02d/%02d", gps.date.month(), gps.date.day(), gps.date.year());
     tft.drawString(sz, 2, 235, 1); 
-    sprintf(sz, "%d.%d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
+    if (wifiAvailable){
+      sprintf(sz, "%d.%d.%d.%d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
+    } else {
+      sprintf(sz, "%d.%d.%d.%d", 192,168,4,1);
+    }
+
     tft.setTextDatum(MR_DATUM);
     tft.drawString("  " + String(settings.call) + "-"  + String(settings.ssid),318,215,1);
-    tft.drawString("  " + String(WiFi.SSID()), 318, 225, 1);
+    tft.drawString("  " + String(wifiAvailable?WiFi.SSID():"APRSWiFi"), 318, 225, 1);
     tft.drawString(sz, 318, 235, 1);
     plotNeedle(gps.speed.kmph(), 30);
   }  
@@ -486,7 +492,8 @@ bool Connect2WiFi() {
     DebugPrint(".");
   }
   DebugPrintln();
-  return (WiFi.status() == WL_CONNECTED);
+  esp_task_wdt_reset();
+  return (wifiMulti.run() == WL_CONNECTED);
 }
 
 void doBeep(int timeLen){
@@ -550,32 +557,39 @@ void PrintGPSInfo() {
 void SendBeacon(bool manual) {
   if (gps.location.age() < 5000 || manual || settings.isDebug) {
     if (settings.isDebug) ShowDebugScreen("Send beacon");
-    if (wifiAvailable && APRSGatewayConnect()) SendBeaconViaWiFi();
+    if (APRSGatewayConnect()) SendBeaconViaWiFi();
     lastBeacon = millis();
   }
 }
 
 bool APRSGatewayConnect() {
   char c[20];
-  sprintf(c, "%s", WiFi.status() == WL_CONNECTED ? "WiFi Connected" : "WiFi NOT Connected");
+  sprintf(c, "%s", wifiMulti.run() == WL_CONNECTED ? "WiFi Connected" : "WiFi NOT Connected");
   DrawDebugInfo(c);
-  if (wifiAvailable && (WiFi.status() != WL_CONNECTED)) {
+
+  if (wifiAvailable && (wifiMulti.run() != WL_CONNECTED)) {
     aprsGatewayConnected = false;
-    if (!Connect2WiFi()) wifiAvailable = false;
+    Connect2WiFi();
+    esp_task_wdt_reset();
   } else DebugPrintln("WiFi available and WiFiStatus connected");
-  if (wifiAvailable) {
+
+  if (wifiAvailable && (wifiMulti.run() == WL_CONNECTED)) {
     if (!aprsGatewayConnected) {
       DrawDebugInfo("Connecting to APRS server...");
       if (httpNet.connect(settings.aprsIP, settings.aprsPort)) {
+        esp_task_wdt_reset();
         if (ReadHTTPNet()) DrawDebugInfo(httpBuf);
+        esp_task_wdt_reset();  
         sprintf(buf, "user %s-%d pass %s vers ", settings.call, settings.serverSsid, settings.aprsPassword, VERSION);
         DrawDebugInfo(buf);
         httpNet.println(buf);
         if (ReadHTTPNet()) {
+          esp_task_wdt_reset();  
           if (strstr(httpBuf, " verified")) {
             DrawDebugInfo(httpBuf);
             DrawDebugInfo("Connected to APRS.FI");
             aprsGatewayConnected = true;
+            esp_task_wdt_reset();  
           } else DrawDebugInfo("Not connected to APRS.FI");
         } else DrawDebugInfo("No response from ReadHTTPNet");
       } else DrawDebugInfo("Failed to connect to APRS.FI, server unavailable");
@@ -588,11 +602,15 @@ bool ReadHTTPNet() {
   httpBuf[0] = '\0';
   bool retVal = false;
   long timeOut = millis();
-  while (!httpNet.available() && millis() - timeOut < 2500) {}
+  while (!httpNet.available() && millis() - timeOut < 2500) 
+  {
+    esp_task_wdt_reset();
+  }
 
   if (httpNet.available()) {
     int i = 0;
     while (httpNet.available() && i < 118) {
+      esp_task_wdt_reset();  
       char c = httpNet.read();
       httpBuf[i++] = c;
     }
