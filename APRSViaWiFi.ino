@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////////////////////////////////
-// V1.6 Verbeterde WiFi recovery
+// V1.7 Verbeterde WiFi recovery
 // V1.5 Webserver implemented including Google Maps
 // V1.4
 //
@@ -64,7 +64,7 @@
 #define TFT_BUTTONTOPCOLOR 0xB5FE
 
 #define OTAHOST      "https://www.rjdekok.nl/Updates/APRSViaWiFi"
-#define OTAVERSION   "v1.6"
+#define OTAVERSION   "v1.7"
 
 #include "NotoSansBold15.h"
 #include "NotoSansBold36.h"
@@ -324,8 +324,8 @@ void loop() {
     tft.setTextPadding(spr_width);
     tft.setTextDatum(MC_DATUM);
     tft.drawString(String(gps.satellites.value()), 12, 12);
-    tft.fillCircle(308, 12, 10, wifiMulti.run() == WL_CONNECTED?TFT_GREEN:TFT_RED);
-    tft.setTextColor(TFT_BLACK, wifiMulti.run() == WL_CONNECTED?TFT_GREEN:TFT_RED, true);
+    tft.fillCircle(308, 12, 10, WiFi.status() == WL_CONNECTED?TFT_GREEN:TFT_RED);
+    tft.setTextColor(TFT_BLACK, WiFi.status() == WL_CONNECTED?TFT_GREEN:TFT_RED, true);
     spr_width = tft.textWidth("W");
     tft.setTextPadding(spr_width);
     tft.setTextDatum(MC_DATUM);
@@ -400,7 +400,6 @@ void loop() {
   }  
 
   if ((millis() - webRefresh) > 1000) {
-    DebugPrintln("Refresh webpage");
     RefreshWebPage();
     webRefresh = millis();
   }
@@ -493,7 +492,7 @@ bool Connect2WiFi() {
   }
   DebugPrintln();
   esp_task_wdt_reset();
-  return (wifiMulti.run() == WL_CONNECTED);
+  return (WiFi.status() == WL_CONNECTED);
 }
 
 void doBeep(int timeLen){
@@ -505,7 +504,8 @@ void doBeep(int timeLen){
 }
 
 void RefreshWebPage() {
-  if (wifiAvailable || wifiAPMode) {
+  if (WiFi.status() == WL_CONNECTED || wifiAPMode) {
+    DebugPrintln("Refresh webpage");
     sprintf(buf, "%s", String(gps.location.lat()==0?settings.lat:gps.location.lat(),4));
     events.send(buf, "LATINFO", millis());
     sprintf(buf, "%s", String(gps.location.lng()==0?settings.lon:gps.location.lng(),4));
@@ -564,16 +564,16 @@ void SendBeacon(bool manual) {
 
 bool APRSGatewayConnect() {
   char c[20];
-  sprintf(c, "%s", wifiMulti.run() == WL_CONNECTED ? "WiFi Connected" : "WiFi NOT Connected");
+  sprintf(c, "%s", WiFi.status() == WL_CONNECTED ? "WiFi Connected" : "WiFi NOT Connected");
   DrawDebugInfo(c);
 
-  if (wifiAvailable && (wifiMulti.run() != WL_CONNECTED)) {
+  if (wifiAvailable && (WiFi.status() != WL_CONNECTED)) {
     aprsGatewayConnected = false;
     Connect2WiFi();
     esp_task_wdt_reset();
   } else DebugPrintln("WiFi available and WiFiStatus connected");
 
-  if (wifiAvailable && (wifiMulti.run() == WL_CONNECTED)) {
+  if (wifiAvailable && (WiFi.status() == WL_CONNECTED)) {
     if (!aprsGatewayConnected) {
       DrawDebugInfo("Connecting to APRS server...");
       if (httpNet.connect(settings.aprsIP, settings.aprsPort)) {
