@@ -1,4 +1,5 @@
 /////////////////////////////////////////////////////////////////////////////////////////
+// V1.8 Beacon Update
 // V1.7 Verbeterde WiFi recovery
 // V1.5 Webserver implemented including Google Maps
 // V1.4
@@ -64,7 +65,7 @@
 #define TFT_BUTTONTOPCOLOR 0xB5FE
 
 #define OTAHOST      "https://www.rjdekok.nl/Updates/APRSViaWiFi"
-#define OTAVERSION   "v1.7"
+#define OTAVERSION   "v1.8"
 
 #include "NotoSansBold15.h"
 #include "NotoSansBold36.h"
@@ -386,6 +387,7 @@ void loop() {
       if (sbCourse > 180) sbCourse = 360 - sbCourse;
       if (sbCourse > 27) doBeacon = true;
     }
+    if (millis() - lastBeacon < 5000) doBeacon = false;
 
     if (doBeacon) {
       lastBeacon = millis();
