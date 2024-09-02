@@ -69,7 +69,7 @@
 
 #include "NotoSansBold15.h"
 #include "NotoSansBold36.h"
-#define AA_FONT_LARGE NotoSansBold15
+#define AA_FONT_SMALL NotoSansBold15
 #define AA_FONT_LARGE NotoSansBold36
 
 #define NEEDLE_LENGTH 35  // Visible length
