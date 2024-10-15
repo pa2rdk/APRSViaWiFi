@@ -3,7 +3,7 @@
 const wlanSSID wifiNetworks[] {
     {"PI4RAZ","PI4RAZ_Zoetermeer"},
     {"Loretz_Gast", "Lor_Steg_98"},
-    {"iPhone van Robert", "0919932003"},
+    {"iPhone van Robert", "12345678"},
     {"Netwerk2", "Netwerk2"},
     {"FHanna", "Kleinsteg71"}
 };
