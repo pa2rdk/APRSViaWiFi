@@ -9,7 +9,7 @@ const wlanSSID wifiNetworks[] {
 };
 
 Settings settings = {
-    '?',                //chkDigit
+    '#',                //chkDigit
     "YourSSID",         //wifiSSID[25];
     "WiFiPassword!",    //wifiPass[25];
     "rotate.aprs.net",  //aprsIP

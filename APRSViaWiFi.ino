@@ -1,4 +1,5 @@
 /////////////////////////////////////////////////////////////////////////////////////////
+// V1.9 Distance to home location
 // V1.8 Beacon Update
 // V1.7 Verbeterde WiFi recovery
 // V1.5 Webserver implemented including Google Maps
@@ -65,7 +66,7 @@
 #define TFT_BUTTONTOPCOLOR 0xB5FE
 
 #define OTAHOST      "https://www.rjdekok.nl/Updates/APRSViaWiFi"
-#define OTAVERSION   "v1.8"
+#define OTAVERSION   "v1.9"
 
 #include "NotoSansBold15.h"
 #include "NotoSansBold36.h"
@@ -171,8 +172,8 @@ const int ledFreq = 5000;
 const int ledResol = 8;
 const int ledChannelforTFT = 0;
 
-//#include "config.h"
-#include "rdk_config.h"  // Change to config.h
+#include "config.h"
+//#include "rdk_config.h"  // Change to config.h
 
 TFT_eSPI tft       = TFT_eSPI();  // Invoke custom library
 TFT_eSprite needle = TFT_eSprite(&tft); // Sprite object for needle
@@ -333,9 +334,12 @@ void loop() {
     tft.drawString("W", 310, 12);
 
     spr_width = tft.textWidth("7777777"); // 7 is widest numeral in this font
+    float distance = gps.distanceBetween(gps.location.lat()==0?settings.lat:gps.location.lat(), gps.location.lng()==0?settings.lon:gps.location.lng(), settings.lat, settings.lon)/1000;
+    Serial.printf("%f, %f, %f, %f, %f\r\n", gps.location.lat()==0?settings.lat:gps.location.lat(), gps.location.lng()==0?settings.lon:gps.location.lng(), settings.lat, settings.lon, distance);
+    tft.setTextColor(TFT_WHITE, bg_color, true);
+    tft.drawString(String(distance,0) + " KM", 160, 150);
     tft.setTextColor(TFT_GREEN, bg_color, true);
     tft.setTextPadding(spr_width);
-    
     tft.drawString("   Lat:" + String(gps.location.lat()==0?settings.lat:gps.location.lat(),6) + "N  ", 160, 180);
     tft.drawString("   Lon:" + String(gps.location.lng()==0?settings.lon:gps.location.lng(),6) + "E  ", 160, 190);
     tft.drawString("   Height:" + String(gps.altitude.meters(),0) + "M   ", 160, 200);
